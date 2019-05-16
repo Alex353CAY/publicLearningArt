@@ -77,6 +77,7 @@ public class Application extends javafx.application.Application {
             alert.showAndWait();
             Platform.exit();
         });
+        stage.setTitle("LearningArt");
         stage.setScene(new Scene(root, 720, 720));
         stage.show();
     }
@@ -236,14 +237,14 @@ public class Application extends javafx.application.Application {
                         } else {
                             if (prediction) {
                                 prediction().nextStep();
-                                if (prediction().result().isPresent()) {
+                                if (prediction() == null) {
                                     menu.disable(Menu.Button.NEXTSTEP, Menu.Button.SKIPREMAININGSTEPS);
                                     Application.this.prediction.getAndSet(null);
                                 }
                             }
                             else {
                                 training().nextStep();
-                                if (training().error().isPresent()) {
+                                if (training() == null) {
                                     menu.disable(Menu.Button.NEXTSTEP, Menu.Button.SKIPREMAININGSTEPS);
                                     Application.this.training.getAndSet(null);
                                 }

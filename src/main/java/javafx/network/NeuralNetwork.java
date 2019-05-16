@@ -29,6 +29,8 @@ public class NeuralNetwork implements model.network.NeuralNetwork, components.ed
             layer.translateYProperty().bind(translateYProperty);
             translateXProperty = layer.translateXProperty().add(30 + 25);
         }
+        root.prefWidthProperty().unbind();
+        root.prefWidthProperty().bind(translateXProperty);
     }
 
     @Override
