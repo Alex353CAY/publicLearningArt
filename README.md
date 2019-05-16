@@ -10,7 +10,7 @@ Currently in LearningArt, there is one type of format in which a prediction inpu
 Currently in LearningArt, there is one type of format in which a training data can be provided — the CSV file (with ',' separator). Each row represents one training example and must contain both input and expected output vectors one after another.
 
 Input | Expected Output
-- | -
+------------- | -------------
 0, 0  | 1
 0, 1  | 1
 1, 0  | 0
