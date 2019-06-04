@@ -18,10 +18,12 @@ public class Connection {
 
     public void select() {
         line.setStrokeWidth(5);
+        selected = true;
     }
 
     public void unselect() {
         line.setStrokeWidth(1);
+        selected = false;
     }
 
     public Connection(Neuron target) {

@@ -23,26 +23,25 @@ public class ConnectionDetailsView {
         root.setCenter(aspects);
         aspects.addRow(0, weightAspect, weightAspectValue);
 
-
-        weightAspectValue.textProperty().addListener((observable, oldValue, newValue) -> {
+        weightAspectValue.setOnAction(event -> {
             try {
-                final String negativeInfinity = String.valueOf(Double.NEGATIVE_INFINITY);
-                final String positiveInfinity = String.valueOf(Double.POSITIVE_INFINITY);
-                if (newValue.equals(negativeInfinity) || newValue.equals(positiveInfinity)) return;
-                int floatingPointPosition = newValue.indexOf(".");
-                if (floatingPointPosition == -1) floatingPointPosition = newValue.length();
-                final String integerPart = newValue.substring(0, floatingPointPosition);
-                final String fractionalPart = newValue.substring(floatingPointPosition);
-                final String modifiedValue = integerPart.replaceAll("[^\\d]", "") + '.' + fractionalPart.replaceAll("[^\\d]", "");
-                weightAspectValue.setText(modifiedValue);
-
-                this.weight = Double.parseDouble(modifiedValue);
+                this.weight = Double.parseDouble(weightAspectValue.getText());
                 weightAspectValue.setText(String.valueOf(weight));
                 if (listener.get() != null) listener.get().onWeightChangeRequest(weight);
             } catch (NumberFormatException e) {
-                weightAspect.setText(String.valueOf(weight));
+                weightAspectValue.setText(String.valueOf(weight));
             }
         });
+
+        /*weightAspectValue.textProperty().addListener((observable, oldValue, newValue) -> {
+            try {
+                this.weight = Double.parseDouble(newValue);
+                weightAspectValue.setText(String.valueOf(weight));
+                if (listener.get() != null) listener.get().onWeightChangeRequest(weight);
+            } catch (NumberFormatException e) {
+                weightAspectValue.setText(String.valueOf(weight));
+            }
+        });*/
 
     }
 

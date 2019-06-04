@@ -1,6 +1,7 @@
 package components.editor.impl;
 
 import com.google.common.primitives.ImmutableDoubleArray;
+import com.google.gson.*;
 import components.editor.Editor;
 import components.editor.components.details.Details;
 import components.editor.components.network.NeuralNetwork;
@@ -13,11 +14,12 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Region;
 import model.layer.DenseLayer;
 import utils.math.activation.Activation;
+import utils.math.activation.ReLU;
 import utils.math.activation.Sigmoid;
 import utils.math.vector.ImmutableVector;
 import utils.math.vector.MutableVector;
 
-import java.io.File;
+import java.io.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -29,7 +31,7 @@ public class EditorImpl implements Editor {
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
     private final Overview overview = new OverviewImpl(new SimpleDoubleProperty(100));
-    private final NeuralNetwork neuralNetwork = new javafx.network.NeuralNetwork();
+    private final javafx.network.NeuralNetwork neuralNetwork = new javafx.network.NeuralNetwork();
     private final Details details = new DetailsImpl();
 
     private final ScrollPane neuralNetworkView = new ScrollPane(neuralNetwork.view());
@@ -74,24 +76,80 @@ public class EditorImpl implements Editor {
         }
     }
 
-    @Deprecated
     @Override
     public void open(File file) {
         lock.writeLock().lock();
         try {
+            close();
+            JsonObject root = new JsonParser().parse(new BufferedReader(new FileReader(file))).getAsJsonObject();
+            root.getAsJsonPrimitive("features");
+            for (int i = 0; i < root.getAsJsonPrimitive("features").getAsInt(); i++) {
+                neuralNetwork.addFeature(i);
+            }
+            final JsonArray layers = root.get("layers").getAsJsonArray();
+            for (JsonElement layerElement: layers) {
+                final JsonObject layer = layerElement.getAsJsonObject();
+                if (layer.get("type").getAsString().equals("dense")) {
+                    final DenseLayer denseLayer = neuralNetwork.addDenseLayer(neuralNetwork.layersCount());
+                    if (layer.has("activations")) {
+                        for (JsonElement jsonActivation : layer.get("activations").getAsJsonArray()) {
+                            Activation activation;
+                            switch (jsonActivation.getAsString()) {
+                                case "Sigmoid": {
+                                    activation = new Sigmoid();
+                                    break;
+                                }
+                                case "ReLU": {
+                                    activation = new ReLU();
+                                    break;
+                                }
+                                default: {
+                                    throw new IllegalArgumentException();
+                                }
+                            }
+                            denseLayer.addNeuron(denseLayer.labelsCount(), activation);
+                        }
+                    }
+                }
+            }
             if (listener.get() != null) {
-                listener.get().onNeuralNetworkClosed();
                 listener.get().onNeuralNetworkOpened();
             }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        catch (IllegalStateException e) {
+          throw new IllegalArgumentException();
         } finally {
             lock.writeLock().unlock();
         }
     }
 
-    @Deprecated
     @Override
     public void save(File file) {
-
+        lock.writeLock().lock();
+        try (final FileWriter fileWriter = new FileWriter(file)) {
+            JsonObject root = new JsonObject();
+            JsonArray layers = new JsonArray();
+            root.addProperty("features", neuralNetwork.featuresCount());
+            root.add("layers", layers);
+            for (int layerIndex = 0; layerIndex < neuralNetwork.layersCount(); layerIndex++) {
+                JsonObject layer = new JsonObject();
+                JsonArray activations = new JsonArray();
+                final NeuralNetwork.DenseLayer denseLayer = neuralNetwork.getDenseLayer(layerIndex);
+                for (int neuronIndex = 0; neuronIndex < denseLayer.labelsCount(); neuronIndex++) {
+                    activations.add(denseLayer.getNeuron(neuronIndex).getActivation().toString());
+                }
+                layer.addProperty("type", "dense");
+                layer.add("activations", activations);
+                layers.add(layer);
+            }
+            fileWriter.write(root.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     @Override
@@ -118,6 +176,7 @@ public class EditorImpl implements Editor {
     @Override
     public Editor.Prediction predict(ImmutableVector input) {
         lock.writeLock().lock();
+        if (listener.get() != null) listener.get().predictionStarted();
         try {
             final Prediction.Builder builder = new Prediction.Builder();
             final ImmutableVector prediction = neuralNetwork.predict(input, builder);
@@ -134,6 +193,7 @@ public class EditorImpl implements Editor {
     @Override
     public Training train(Iterable<TrainingExample> dataSet) {
         lock.writeLock().lock();
+        if (listener.get() != null) listener.get().trainingStarted();
         try {
             final Training.Builder builder = new Training.Builder();
             MutableVector error = null;

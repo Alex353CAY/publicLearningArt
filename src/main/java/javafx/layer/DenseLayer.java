@@ -101,6 +101,11 @@ public class DenseLayer extends Layer implements model.layer.DenseLayer, NeuralN
     }
 
     @Override
+    public NeuralNetwork.ActivationNeuron getNeuron(int index) {
+        return neurons.get(index);
+    }
+
+    @Override
     public void setListener(Listener listener) {
         this.listener = listener;
     }
@@ -110,6 +115,8 @@ public class DenseLayer extends Layer implements model.layer.DenseLayer, NeuralN
         private final javafx.neuron.Neuron view;
         private final List<DenseLayer.Connection> connections = new ArrayList<>();
         private Listener listener;
+
+        private double bias = 0;
 
         private Neuron(Activation activation, int neuronIndex) {
             this.activation = activation;
@@ -144,7 +151,9 @@ public class DenseLayer extends Layer implements model.layer.DenseLayer, NeuralN
         }
 
         public double predict(ImmutableVector input, NeuralNetwork.Prediction.Builder predictionBuilder) {
-            double sum = 0;
+            double sum = bias;
+            double finalSum = sum;
+            predictionBuilder.addStep(() -> view.setPrediction(finalSum), "Учет смещения нейрона");
             final AtomicReference<Connection> previousConnection = new AtomicReference<>();
             for (int i = 0; i < connections.size(); i++) {
                 final double delta = input.get(i) * connections.get(i).getWeight();
@@ -173,6 +182,8 @@ public class DenseLayer extends Layer implements model.layer.DenseLayer, NeuralN
         public ImmutableVector inputError(double error, components.editor.components.network.NeuralNetwork.Training.Builder trainingBuilder) {
             final ImmutableDoubleArray.Builder inputErrorBuilder = ImmutableDoubleArray.builder();
             final AtomicReference<Connection> previousConnection = new AtomicReference<>();
+            inputErrorBuilder.add(bias * error);
+            trainingBuilder.addStep(() -> {}, "Вычисление ошибки " + bias * error + "смещения нейрона");
             for (int i = 0; i < connections.size(); i++) {
                 final Connection connection = connections.get(i);
                 final double connectionError = error * connection.getWeight();
@@ -195,11 +206,13 @@ public class DenseLayer extends Layer implements model.layer.DenseLayer, NeuralN
         }
 
         public void train(ImmutableVector input, double error, double learningRate, components.editor.components.network.NeuralNetwork.Training.Builder trainingBuilder) {
-            double sum = 0;
+            double sum = bias;
             for (int i = 0; i < connections.size(); i++) {
                 sum += input.get(i) * connections.get(i).getWeight();
             }
             double weightsDelta = activation.derivative(sum) * error;
+            bias += weightsDelta * learningRate;
+            trainingBuilder.addStep(() -> {}, "Корректировка смещения нейрона");
             final AtomicReference<Connection> previousConnection = new AtomicReference<>();
             for (int i = 0; i < connections.size(); i++) {
                 final Connection connection = connections.get(i);

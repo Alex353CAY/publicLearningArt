@@ -16,10 +16,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import utils.math.vector.ImmutableVector;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -101,7 +98,18 @@ public class Application extends javafx.application.Application {
                     case OPEN: {
                         final FileChooser fileChooser = new FileChooser();
                         final File file = fileChooser.showOpenDialog(stage());
-                        if (file != null) editor.open(file);
+                        try {
+                            if (file != null) {
+                                editor.open(file);
+                                openedFile.setValue(file);
+                                menu.enable(Menu.Button.SAVE);
+                            }
+                        } catch (IllegalArgumentException e) {
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setHeaderText("Открытие файла неподдерживаемого формата");
+                            alert.setContentText("");
+                            alert.showAndWait();
+                        }
                         break;
                     }
                     case SAVE: {
@@ -110,10 +118,11 @@ public class Application extends javafx.application.Application {
                     }
                     case SAVEAS: {
                         final FileChooser fileChooser = new FileChooser();
-                        final File file = fileChooser.showOpenDialog(stage());
+                        final File file = fileChooser.showSaveDialog(stage());
                         if (file != null) {
                             editor.save(file);
                             openedFile.setValue(file);
+                            menu.enable(Menu.Button.SAVE);
                         }
                         break;
                     }
@@ -171,13 +180,40 @@ public class Application extends javafx.application.Application {
                         final File file = new FileChooser().showOpenDialog(stage());
                         if (file != null) {
                             CSVReader reader = new CSVReader(new FileReader(file), ',', '"');
-                            String[] row = reader.readNext();
-                            final ImmutableDoubleArray.Builder builder = ImmutableDoubleArray.builder();
-                            for (String s : row) {
-                                builder.add(Double.parseDouble(s));
+                            try {
+                                String[] row = reader.readNext();
+                                final ImmutableDoubleArray.Builder builder = ImmutableDoubleArray.builder();
+                                if (row == null || reader.readNext() != null) {
+                                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                                    alert.setTitle("Ошибка открытия конфигурационного файла");
+                                    alert.setHeaderText("Открытие файла неподдерживаемого формата");
+                                    alert.setContentText("");
+                                    alert.showAndWait();
+                                } else {
+                                    for (String s : row) {
+                                        builder.add(Double.parseDouble(s));
+                                    }
+                                    editor.applyToNeuralNetwork(neuralNetwork -> {
+                                        final ImmutableDoubleArray array = builder.build();
+                                        if (neuralNetwork.featuresCount() == array.length()) {
+                                            predictionData.getAndSet(new ImmutableVector(builder.build()));
+                                            menu.enable(Menu.Button.PREDICTION, Menu.Button.PREDICTIONDEBUG);
+                                        } else {
+                                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                                            alert.setTitle("Ошибка открытия конфигурационного файла");
+                                            alert.setHeaderText("Вектор входных данных не подходит для текущей конфигурации искусственной нейронной сети");
+                                            alert.setContentText("");
+                                            alert.showAndWait();
+                                        }
+                                    });
+                                }
+                            } catch (IOException e) {
+                                Alert alert = new Alert(Alert.AlertType.ERROR);
+                                alert.setTitle("Ошибка открытия конфигурационного файла");
+                                alert.setHeaderText("Открытие файла неподдерживаемого формата");
+                                alert.setContentText("");
+                                alert.showAndWait();
                             }
-                            predictionData.getAndSet(new ImmutableVector(builder.build()));
-                            menu.enable(Menu.Button.PREDICTION, Menu.Button.PREDICTIONDEBUG);
                         } else {
                             menu.disable(Menu.Button.PREDICTION, Menu.Button.PREDICTIONDEBUG);
                         }
@@ -210,6 +246,7 @@ public class Application extends javafx.application.Application {
                                 }
                                 trainingSet.add(builder.build());
                             });
+                            trainingData();
                             trainingData.getAndSet(trainingSet);
                             menu.enable(Menu.Button.TRAINING, Menu.Button.TRAININGDEBUG);
                         } else {
@@ -303,19 +340,21 @@ public class Application extends javafx.application.Application {
         @Override
         public void onNeuralNetworkOpened() {
             menu.enable(
-                    Menu.Button.CREATE, Menu.Button.CLOSE,
+                    Menu.Button.CREATE, Menu.Button.OPEN, Menu.Button.CLOSE,
+                    Menu.Button.SAVEAS,
                     Menu.Button.ADDFEATURE, Menu.Button.REMOVEFEATURE,
                     Menu.Button.ADDDENSELAYER, Menu.Button.REMOVELAYER,
                     Menu.Button.PREDICTIONDATA,
                     Menu.Button.TRAININGDATA
             );
+            if (openedFile.get() != null) menu.enable(Menu.Button.SAVE);
             menu.disable(Menu.Button.NEXTSTEP, Menu.Button.SKIPREMAININGSTEPS);
         }
 
         @Override
         public void onNeuralNetworkClosed() {
             menu.disable(
-                    Menu.Button.OPEN, Menu.Button.SAVE, Menu.Button.SAVE, Menu.Button.SAVEAS, Menu.Button.CLOSE,
+                    Menu.Button.SAVE, Menu.Button.SAVEAS, Menu.Button.CLOSE,
                     Menu.Button.ADDFEATURE, Menu.Button.REMOVEFEATURE,
                     Menu.Button.ADDDENSELAYER, Menu.Button.REMOVELAYER,
                     Menu.Button.PREDICTION, Menu.Button.PREDICTIONDEBUG, Menu.Button.PREDICTIONDATA,
@@ -323,12 +362,13 @@ public class Application extends javafx.application.Application {
                     Menu.Button.NEXTSTEP, Menu.Button.SKIPREMAININGSTEPS
             );
             menu.enable(Menu.Button.CREATE);
+            openedFile.setValue(null);
         }
 
         @Override
         public void predictionStarted() {
             menu.disable(
-                    Menu.Button.CLOSE,
+                    Menu.Button.OPEN, Menu.Button.CREATE, Menu.Button.CLOSE,
                     Menu.Button.PREDICTION, Menu.Button.PREDICTIONDEBUG, Menu.Button.PREDICTIONDATA,
                     Menu.Button.TRAINING, Menu.Button.TRAININGDEBUG, Menu.Button.TRAININGDATA
             );
@@ -343,6 +383,8 @@ public class Application extends javafx.application.Application {
                     Menu.Button.PREDICTION, Menu.Button.PREDICTIONDEBUG, Menu.Button.PREDICTIONDATA,
                     Menu.Button.TRAINING, Menu.Button.TRAININGDEBUG, Menu.Button.TRAININGDATA
             );
+            menu.enable(Menu.Button.OPEN, Menu.Button.CREATE, Menu.Button.CLOSE);
+            if (openedFile.get() != null) menu.enable(Menu.Button.SAVE);
             if (predictionData.get() == null) menu.disable(Menu.Button.PREDICTION, Menu.Button.PREDICTIONDEBUG);
             if (trainingData.get() == null) menu.disable(Menu.Button.TRAINING, Menu.Button.TRAININGDEBUG);
             prediction.getAndSet(null);
@@ -351,7 +393,7 @@ public class Application extends javafx.application.Application {
         @Override
         public void trainingStarted() {
             menu.disable(
-                    Menu.Button.CLOSE,
+                    Menu.Button.OPEN, Menu.Button.CREATE, Menu.Button.CLOSE, Menu.Button.SAVE, Menu.Button.SAVEAS,
                     Menu.Button.PREDICTION, Menu.Button.PREDICTIONDEBUG, Menu.Button.PREDICTIONDATA,
                     Menu.Button.TRAINING, Menu.Button.TRAININGDEBUG, Menu.Button.TRAININGDATA
             );
@@ -362,10 +404,12 @@ public class Application extends javafx.application.Application {
         public void trainingFinished() {
             menu.disable(Menu.Button.NEXTSTEP, Menu.Button.SKIPREMAININGSTEPS);
             menu.enable(
-                    Menu.Button.CLOSE,
+                    Menu.Button.SAVEAS, Menu.Button.CLOSE,
                     Menu.Button.PREDICTION, Menu.Button.PREDICTIONDEBUG, Menu.Button.PREDICTIONDATA,
                     Menu.Button.TRAINING, Menu.Button.TRAININGDEBUG, Menu.Button.TRAININGDATA
             );
+            menu.enable(Menu.Button.OPEN, Menu.Button.CREATE, Menu.Button.CLOSE);
+            if (openedFile.get() != null) menu.enable(Menu.Button.SAVE);
             if (predictionData.get() == null) menu.disable(Menu.Button.PREDICTION, Menu.Button.PREDICTIONDEBUG);
             if (trainingData.get() == null) menu.disable(Menu.Button.TRAINING, Menu.Button.TRAININGDEBUG);
             training.getAndSet(null);
@@ -386,23 +430,32 @@ public class Application extends javafx.application.Application {
     }
 
     private Iterable<Editor.TrainingExample> trainingData() {
-        AtomicInteger inputSize = new AtomicInteger();
-        editor.applyToNeuralNetwork(neuralNetwork -> {
-            inputSize.getAndSet(neuralNetwork.featuresCount());
-        });
-        List<Editor.TrainingExample> examples = new ArrayList<>();
-        trainingData.get().forEach(immutableDoubleArray -> {
-            final ImmutableDoubleArray.Builder inputBuilder = ImmutableDoubleArray.builder();
-            final ImmutableDoubleArray.Builder outputBuilder = ImmutableDoubleArray.builder();
-            for (int i = 0; i < inputSize.get(); i++) {
-                inputBuilder.add(immutableDoubleArray.get(i));
-            }
-            for (int i = inputSize.get(); i < immutableDoubleArray.length(); i++) {
-                outputBuilder.add(immutableDoubleArray.get(i));
-            }
-            examples.add(new Editor.TrainingExample(new ImmutableVector(inputBuilder.build()), new ImmutableVector(outputBuilder.build())));
-        });
-        return examples;
+        try {
+            AtomicInteger inputSize = new AtomicInteger();
+            editor.applyToNeuralNetwork(neuralNetwork -> {
+                inputSize.getAndSet(neuralNetwork.featuresCount());
+            });
+            List<Editor.TrainingExample> examples = new ArrayList<>();
+            trainingData.get().forEach(immutableDoubleArray -> {
+                final ImmutableDoubleArray.Builder inputBuilder = ImmutableDoubleArray.builder();
+                final ImmutableDoubleArray.Builder outputBuilder = ImmutableDoubleArray.builder();
+                for (int i = 0; i < inputSize.get(); i++) {
+                    inputBuilder.add(immutableDoubleArray.get(i));
+                }
+                for (int i = inputSize.get(); i < immutableDoubleArray.length(); i++) {
+                    outputBuilder.add(immutableDoubleArray.get(i));
+                }
+                examples.add(new Editor.TrainingExample(new ImmutableVector(inputBuilder.build()), new ImmutableVector(outputBuilder.build())));
+            });
+            return examples;
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Ошибка открытия конфигурационного файла");
+            alert.setHeaderText("Тренировочные данные не подходят для текущей конфигурации искусственной нейронной сети");
+            alert.setContentText("");
+            alert.showAndWait();
+            return new ArrayList<>();
+        }
     }
 
     private Editor.Prediction prediction() {

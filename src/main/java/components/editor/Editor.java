@@ -5,13 +5,14 @@ import model.network.NeuralNetwork;
 import utils.math.vector.ImmutableVector;
 
 import java.io.File;
+import java.util.IllegalFormatException;
 import java.util.Optional;
 import java.util.function.Consumer;
 
 public interface Editor extends Component {
     void create();
-    @Deprecated void open(File file);
-    @Deprecated void save(File file);
+    void open(File file);
+    void save(File file);
     void close();
 
     void applyToNeuralNetwork(Consumer<NeuralNetwork> consumer);

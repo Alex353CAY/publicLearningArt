@@ -22,6 +22,7 @@ public interface NeuralNetwork extends model.network.NeuralNetwork, Component {
     }
 
     interface DenseLayer extends Layer, model.layer.DenseLayer {
+        ActivationNeuron getNeuron(int index);
         void setListener(Listener listener);
 
         interface Listener {

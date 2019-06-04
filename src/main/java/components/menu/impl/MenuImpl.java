@@ -29,7 +29,7 @@ public class MenuImpl implements components.menu.Menu {
     private final Menu trainingMenu = new Menu("Обучение", null, trainingBtn, trainingDebugBtn, trainingSettingsBtn);
     private final Menu aboutMenu = new Menu("Справка");
     private final javafx.scene.control.Button nextStep = new javafx.scene.control.Button("Следующее действие");
-    private final javafx.scene.control.Button skipRemainingSteps = new javafx.scene.control.Button("Пропустить оставшиееся действия");
+    private final javafx.scene.control.Button skipRemainingSteps = new javafx.scene.control.Button("Пропустить оставшиеся действия");
 
     private final ButtonBar controls = new ButtonBar();
     private final MenuBar menuBar = new MenuBar(fileMenu, editMenu, predictionMenu, trainingMenu, aboutMenu);

@@ -63,6 +63,10 @@ public class NeuralNetwork implements model.network.NeuralNetwork, components.ed
         return layer;
     }
 
+    public DenseLayer getDenseLayer(int index) {
+        return hiddenLayers.get(index);
+    }
+
     @Override
     public model.layer.Layer removeLayer(int index) {
         final javafx.layer.DenseLayer removedLayer = hiddenLayers.remove(index);
